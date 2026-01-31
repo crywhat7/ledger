@@ -39,7 +39,7 @@ function formatDate(date: Date) {
 export default function DashboardPage() {
   const router = useRouter();
   const { session, hydrate, logout } = useSessionStore();
-  const [showIncomeAlert, setShowIncomeAlert] = useState(true);
+  const [showIncomeAlertDismissed, setShowIncomeAlertDismissed] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddType, setQuickAddType] = useState<"income" | "expense" | "transfer" | "cc_charge" | "cc_payment">("expense");
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [paidThisMonth, setPaidThisMonth] = useState<{ budget_id: string }[]>([]);
+  const [incomeLogThisMonth, setIncomeLogThisMonth] = useState<{ expected_date: string }[]>([]);
 
   const loadAccounts = useCallback(async () => {
     if (!session) return;
@@ -64,7 +65,7 @@ export default function DashboardPage() {
     const month = getMonthKey(now);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const endDate = `${month}-${String(lastDay).padStart(2, "0")}`;
-    const [schedRes, txRes, budgRes, paidRes] = await Promise.all([
+    const [schedRes, txRes, budgRes, paidRes, logRes] = await Promise.all([
       supabase.from("income_schedules").select("*").eq("user_id", session.userId),
       supabase
         .from("transactions")
@@ -78,11 +79,18 @@ export default function DashboardPage() {
         .select("budget_id")
         .eq("user_id", session.userId)
         .eq("month", month),
+      supabase
+        .from("income_registration_log")
+        .select("expected_date")
+        .eq("user_id", session.userId)
+        .gte("expected_date", `${month}-01`)
+        .lte("expected_date", endDate),
     ]);
     setIncomeSchedules(schedRes.data ?? []);
     setTransactions(txRes.data ?? []);
     setBudgets(budgRes.data ?? []);
     setPaidThisMonth(paidRes.data ?? []);
+    setIncomeLogThisMonth(logRes.data ?? []);
   }, [session]);
 
   useEffect(() => {
@@ -115,13 +123,21 @@ export default function DashboardPage() {
     (b) => !paidThisMonth.some((p) => p.budget_id === b.id)
   );
 
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const registeredDates = new Set(incomeLogThisMonth.map((e) => e.expected_date));
+  const hasUnregisteredPayday = incomeSchedules.some((s) => {
+    if (!s.is_active) return false;
+    const expectedDate = `${monthKey}-${String(s.day_of_month).padStart(2, "0")}`;
+    return expectedDate <= todayStr && !registeredDates.has(expectedDate);
+  });
+  const showIncomeAlert = hasUnregisteredPayday;
+
   function handleLogout() {
     logout();
     router.replace("/login");
   }
 
   function handleAddIncome() {
-    setShowIncomeAlert(false);
     setQuickAddType("income");
     setShowQuickAdd(true);
   }
@@ -184,13 +200,16 @@ export default function DashboardPage() {
           </h2>
         </motion.div>
 
-        {showIncomeAlert && (
+        {showIncomeAlert && !showIncomeAlertDismissed && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <IncomeRequiredAlert onAddIncome={handleAddIncome} />
+            <IncomeRequiredAlert
+              onAddIncome={handleAddIncome}
+              onDismiss={() => setShowIncomeAlertDismissed(true)}
+            />
           </motion.div>
         )}
 

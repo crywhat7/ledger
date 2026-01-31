@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
       to_account_id,
       credit_card_account_id,
       transaction_date,
+      income_schedule_id,
     } = body as {
       userId?: string;
       type?: TransactionType;
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
       to_account_id?: string;
       credit_card_account_id?: string;
       transaction_date?: string;
+      income_schedule_id?: string | null;
     };
 
     if (!userId || !type || amount == null || amount <= 0 || !account_id) {
@@ -123,6 +125,12 @@ export async function POST(request: NextRequest) {
         .from("accounts")
         .update({ balance: currentBalance + numAmount })
         .eq("id", account_id);
+      await supabase.from("income_registration_log").insert({
+        user_id: userId,
+        schedule_id: income_schedule_id || null,
+        expected_date: date,
+        transaction_id: tx.id,
+      });
     } else if (type === "expense") {
       await supabase
         .from("accounts")

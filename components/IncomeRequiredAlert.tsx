@@ -1,20 +1,32 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface IncomeRequiredAlertProps {
   onAddIncome?: () => void;
+  onDismiss?: () => void;
 }
 
-export function IncomeRequiredAlert({ onAddIncome }: IncomeRequiredAlertProps) {
+export function IncomeRequiredAlert({ onAddIncome, onDismiss }: IncomeRequiredAlertProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="relative overflow-hidden border border-foreground bg-foreground text-background"
     >
+      {onDismiss && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onDismiss}
+          className="absolute right-2 top-2 size-8 text-background/70 hover:bg-background/20 hover:text-background"
+          aria-label="Cerrar"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
       <div
         className="absolute inset-0 opacity-5"
         style={{

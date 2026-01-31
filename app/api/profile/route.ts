@@ -27,9 +27,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const displayNameValue = display_name == null ? null : String(display_name).trim() || null;
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ display_name: display_name == null ? null : String(display_name).trim() || null })
+      .update({ display_name: displayNameValue } as Database["public"]["Tables"]["profiles"]["Update"])
       .eq("id", profile.id);
 
     if (updateError) {

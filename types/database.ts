@@ -198,6 +198,25 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["income_schedules"]["Insert"]>;
       };
+      income_registration_log: {
+        Row: {
+          id: string;
+          user_id: string;
+          schedule_id: string | null;
+          expected_date: string;
+          registered_at: string;
+          transaction_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          schedule_id?: string | null;
+          expected_date: string;
+          registered_at?: string;
+          transaction_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["income_registration_log"]["Insert"]>;
+      };
     };
   };
 }
