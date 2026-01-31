@@ -32,7 +32,6 @@ export function PinPad({ username, error, onSuccess, onError, onBack }: PinPadPr
       if (newPin.length === 6) {
         setLoading(true);
         onError("");
-        setErrorState(null);
         (async () => {
           try {
             const { verifyPin } = await import("@/lib/auth");

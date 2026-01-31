@@ -11,7 +11,6 @@ import { IncomeRequiredAlert } from "@/components/IncomeRequiredAlert";
 import { BudgetCard } from "@/components/BudgetCard";
 import { AccountCard } from "@/components/AccountCard";
 import { QuickAddModal } from "@/components/QuickAddModal";
-import { AddAccountForm } from "@/components/AddAccountForm";
 import type { Account } from "@/types/database";
 import { supabase } from "@/lib/supabase/client";
 import { playShutterSound } from "@/lib/sound";
@@ -28,7 +27,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const { session, hydrate, logout } = useSessionStore();
   const [showIncomeAlert, setShowIncomeAlert] = useState(true);
-  const [showSetup, setShowSetup] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddType, setQuickAddType] = useState<"income" | "expense" | "transfer" | "cc_charge" | "cc_payment">("expense");
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -101,15 +99,12 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowSetup(true)}
-              className="size-8"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="sr-only">Ajustes</span>
-            </Button>
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" className="size-8">
+                <Settings className="h-4 w-4" />
+                <span className="sr-only">Ajustes</span>
+              </Button>
+            </Link>
             <Button variant="ghost" size="icon" onClick={handleLogout} className="size-8">
               <LogOut className="h-4 w-4" />
               <span className="sr-only">Cerrar sesión</span>
@@ -193,7 +188,11 @@ export default function DashboardPage() {
           {accounts.length === 0 && (
             <div className="border border-dashed border-border py-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Sin cuentas. Configuralas en Ajustes.
+                Sin cuentas. Configuralas en{" "}
+                <Link href="/settings" className="underline hover:no-underline">
+                  Ajustes
+                </Link>
+                .
               </p>
             </div>
           )}
@@ -250,35 +249,6 @@ export default function DashboardPage() {
         onSuccess={loadAccounts}
         playSound={playShutterSound}
       />
-
-      {showSetup && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-6"
-          onClick={() => setShowSetup(false)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm border border-border bg-background p-6"
-          >
-            <h2 className="font-serif text-xl font-light">Ajustes</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Agregá una cuenta para empezar a registrar movimientos.
-            </p>
-            <div className="mt-6">
-              <AddAccountForm
-                userId={session.userId}
-                onSuccess={() => {
-                  loadAccounts();
-                  setShowSetup(false);
-                }}
-                onCancel={() => setShowSetup(false)}
-              />
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }

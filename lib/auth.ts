@@ -5,6 +5,7 @@ export interface SessionData {
   userId: string;
   username: string;
   displayName?: string | null;
+  apiKey?: string | null;
   createdAt: number;
 }
 
@@ -62,11 +63,17 @@ export async function verifyPin(username: string, pin: string): Promise<SessionD
     body: JSON.stringify({ username: username.trim().toLowerCase(), pin }),
   });
   if (!res.ok) return null;
-  const data = (await res.json()) as { userId: string; username: string; displayName?: string | null };
+  const data = (await res.json()) as {
+    userId: string;
+    username: string;
+    displayName?: string | null;
+    apiKey?: string | null;
+  };
   const session: SessionData = {
     userId: data.userId,
     username: data.username,
     displayName: data.displayName,
+    apiKey: data.apiKey ?? null,
     createdAt: Date.now(),
   };
   setStoredSession(session);
