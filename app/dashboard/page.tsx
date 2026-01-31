@@ -18,7 +18,6 @@ import {
   getExpectedIncomeMonthly,
   getActualIncomeInMonth,
   getActualExpensesInMonth,
-  getFixedMonthlyTotal,
   getRemainingThisMonth,
   getWeeklyDisposable,
   getDailyDisposable,
@@ -47,6 +46,7 @@ export default function DashboardPage() {
   const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [paidThisMonth, setPaidThisMonth] = useState<{ budget_id: string }[]>([]);
 
   const loadAccounts = useCallback(async () => {
     if (!session) return;
@@ -64,7 +64,7 @@ export default function DashboardPage() {
     const month = getMonthKey(now);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const endDate = `${month}-${String(lastDay).padStart(2, "0")}`;
-    const [schedRes, txRes, budgRes] = await Promise.all([
+    const [schedRes, txRes, budgRes, paidRes] = await Promise.all([
       supabase.from("income_schedules").select("*").eq("user_id", session.userId),
       supabase
         .from("transactions")
@@ -73,10 +73,16 @@ export default function DashboardPage() {
         .gte("transaction_date", `${month}-01`)
         .lte("transaction_date", endDate),
       supabase.from("budgets").select("*").eq("user_id", session.userId),
+      supabase
+        .from("budget_month_paid")
+        .select("budget_id")
+        .eq("user_id", session.userId)
+        .eq("month", month),
     ]);
     setIncomeSchedules(schedRes.data ?? []);
     setTransactions(txRes.data ?? []);
     setBudgets(budgRes.data ?? []);
+    setPaidThisMonth(paidRes.data ?? []);
   }, [session]);
 
   useEffect(() => {
@@ -98,11 +104,16 @@ export default function DashboardPage() {
   const expectedIncome = getExpectedIncomeMonthly(incomeSchedules);
   const actualIncome = getActualIncomeInMonth(transactions, monthKey);
   const actualExpenses = getActualExpensesInMonth(transactions, monthKey);
-  const fixedMonthly = getFixedMonthlyTotal(budgets);
-  const remaining = getRemainingThisMonth(actualIncome, fixedMonthly, actualExpenses);
+  // Disponible = ingresos reales − gastos reales (no restamos gastos fijos; cuando los pagás, entran como gasto normal)
+  const remaining = getRemainingThisMonth(actualIncome, 0, actualExpenses);
   const weeksLeft = getWeeksLeftInMonth(today);
   const weeklyDisposable = getWeeklyDisposable(remaining, weeksLeft);
   const dailyDisposable = getDailyDisposable(weeklyDisposable);
+
+  const fixedMonthlyBudgets = budgets.filter((b) => b.period === "monthly");
+  const unpaidFixedBudgets = fixedMonthlyBudgets.filter(
+    (b) => !paidThisMonth.some((p) => p.budget_id === b.id)
+  );
 
   function handleLogout() {
     logout();
@@ -213,6 +224,32 @@ export default function DashboardPage() {
             />
           </div>
         </section>
+
+        {unpaidFixedBudgets.length > 0 && (
+          <section className="mb-8">
+            <h3 className="mb-4 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Gastos fijos no pagados este mes
+            </h3>
+            <div className="border border-border bg-background">
+              <ul className="divide-y divide-border">
+                {unpaidFixedBudgets.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex items-center justify-between px-4 py-3 text-sm"
+                  >
+                    <span className="text-foreground">{b.name}</span>
+                    <span className="font-medium text-foreground">
+                      {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(Number(b.amount))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+                Al registrar el pago en Agregar movimiento, marcá “¿Es para un gasto fijo?” y elegí uno para marcarlo como pagado.
+              </p>
+            </div>
+          </section>
+        )}
 
         <section className="mb-8">
           <div className="mb-4 flex items-center justify-between">

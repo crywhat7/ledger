@@ -2,11 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, CreditCard } from "lucide-react";
+import { X, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, CreditCard, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase/client";
+import { getMonthKey } from "@/lib/budget";
 import type { Account } from "@/types/database";
+import type { Budget } from "@/types/database";
 
 type TransactionType = "income" | "expense" | "transfer" | "cc_charge" | "cc_payment";
 
@@ -61,6 +64,10 @@ export function QuickAddModal({
   const [accountId, setAccountId] = useState(defaultAccountId || "");
   const [toAccountId, setToAccountId] = useState("");
   const [ccAccountId, setCcAccountId] = useState("");
+  const [isFixedExpense, setIsFixedExpense] = useState(false);
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
+  const [fixedBudgets, setFixedBudgets] = useState<Budget[]>([]);
+  const [paidThisMonthIds, setPaidThisMonthIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const amountRef = useRef<HTMLInputElement>(null);
@@ -73,10 +80,51 @@ export function QuickAddModal({
       setCcAccountId("");
       setAmount("");
       setConcept("");
+      setIsFixedExpense(false);
+      setSelectedBudgetId(null);
       setError("");
       setTimeout(() => amountRef.current?.focus(), 100);
     }
   }, [isOpen, defaultType, defaultAccountId, accounts]);
+
+  useEffect(() => {
+    if (!isOpen || type !== "expense" || !userId) return;
+    const month = getMonthKey(new Date());
+    (async () => {
+      const [budgRes, paidRes] = await Promise.all([
+        supabase
+          .from("budgets")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("period", "monthly")
+          .order("name"),
+        supabase
+          .from("budget_month_paid")
+          .select("budget_id")
+          .eq("user_id", userId)
+          .eq("month", month),
+      ]);
+      setFixedBudgets(budgRes.data ?? []);
+      setPaidThisMonthIds(new Set((paidRes.data ?? []).map((p) => p.budget_id)));
+    })();
+  }, [isOpen, type, userId]);
+
+  useEffect(() => {
+    if (type !== "expense") {
+      setIsFixedExpense(false);
+      setSelectedBudgetId(null);
+    }
+  }, [type]);
+
+  useEffect(() => {
+    if (selectedBudgetId && fixedBudgets.length) {
+      const b = fixedBudgets.find((x) => x.id === selectedBudgetId);
+      if (b) {
+        setAmount(String(Number(b.amount)));
+        setConcept(b.name);
+      }
+    }
+  }, [selectedBudgetId, fixedBudgets]);
 
   const filteredFromAccounts = accounts.filter((a) => {
     if (type === "cc_charge") return a.type !== "credit_card";
@@ -136,6 +184,17 @@ export function QuickAddModal({
       if (!res.ok) {
         setError(data.error || "Error al guardar");
         return;
+      }
+      if (type === "expense" && selectedBudgetId) {
+        const month = getMonthKey(new Date());
+        const { error: paidError } = await supabase.from("budget_month_paid").insert({
+          user_id: userId,
+          budget_id: selectedBudgetId,
+          month,
+        });
+        if (paidError && paidError.code !== "23505") {
+          setError("Movimiento guardado pero no se marcó el gasto fijo como pagado.");
+        }
       }
       playSound?.();
       onSuccess?.();
@@ -227,6 +286,62 @@ export function QuickAddModal({
                     className="h-12 border-border bg-transparent"
                   />
                 </div>
+
+                {type === "expense" && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isFixedExpense}
+                        onClick={() => {
+                          setIsFixedExpense((v) => !v);
+                          if (isFixedExpense) setSelectedBudgetId(null);
+                        }}
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center border transition-colors",
+                          isFixedExpense ? "border-foreground bg-foreground text-background" : "border-border"
+                        )}
+                      >
+                        {isFixedExpense && <CheckSquare className="h-3.5 w-3.5" />}
+                      </button>
+                      <span className="text-sm text-foreground">¿Es para un gasto fijo?</span>
+                    </div>
+                    {isFixedExpense && fixedBudgets.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Gasto fijo
+                        </label>
+                        <select
+                          value={selectedBudgetId ?? ""}
+                          onChange={(e) => setSelectedBudgetId(e.target.value || null)}
+                          className="h-12 w-full border border-border bg-transparent px-4 text-foreground focus:border-foreground focus:outline-none"
+                        >
+                          <option value="">Elegir gasto fijo</option>
+                          {fixedBudgets.map((b) => {
+                            const paid = paidThisMonthIds.has(b.id);
+                            return (
+                              <option key={b.id} value={b.id}>
+                                {b.name} — L {new Intl.NumberFormat("es-HN").format(Number(b.amount))}
+                                {paid ? " ✓ Pagado este mes" : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {selectedBudgetId && (
+                          <p className="text-xs text-muted-foreground">
+                            Monto y concepto se rellenaron; podés corroborarlos arriba antes de guardar.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {isFixedExpense && fixedBudgets.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No tenés gastos fijos mensuales. Agregá uno en Presupuesto.
+                      </p>
+                    )}
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
