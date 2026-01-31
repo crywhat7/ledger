@@ -21,9 +21,9 @@ export function AccountCard({ account, onClick }: AccountCardProps) {
 
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
-    const formatted = new Intl.NumberFormat("es-AR", {
+    const formatted = new Intl.NumberFormat("es-HN", {
       style: "currency",
-      currency: "USD",
+      currency: "HNL",
       minimumFractionDigits: 2,
     }).format(Math.abs(value));
     return isNegative ? `-${formatted}` : formatted;

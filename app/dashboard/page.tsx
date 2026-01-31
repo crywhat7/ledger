@@ -14,6 +14,20 @@ import { QuickAddModal } from "@/components/QuickAddModal";
 import type { Account } from "@/types/database";
 import { supabase } from "@/lib/supabase/client";
 import { playShutterSound } from "@/lib/sound";
+import {
+  getExpectedIncomeMonthly,
+  getActualIncomeInMonth,
+  getActualExpensesInMonth,
+  getFixedMonthlyTotal,
+  getRemainingThisMonth,
+  getWeeklyDisposable,
+  getDailyDisposable,
+  getWeeksLeftInMonth,
+  getMonthKey,
+} from "@/lib/budget";
+import type { IncomeSchedule } from "@/types/database";
+import type { Budget } from "@/types/database";
+import type { Transaction } from "@/types/database";
 
 function formatDate(date: Date) {
   return date.toLocaleDateString("es-AR", {
@@ -30,6 +44,9 @@ export default function DashboardPage() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddType, setQuickAddType] = useState<"income" | "expense" | "transfer" | "cc_charge" | "cc_payment">("expense");
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const loadAccounts = useCallback(async () => {
     if (!session) return;
@@ -39,6 +56,27 @@ export default function DashboardPage() {
       .eq("user_id", session.userId)
       .order("created_at", { ascending: true });
     setAccounts(data ?? []);
+  }, [session]);
+
+  const loadBudgetData = useCallback(async () => {
+    if (!session) return;
+    const now = new Date();
+    const month = getMonthKey(now);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const endDate = `${month}-${String(lastDay).padStart(2, "0")}`;
+    const [schedRes, txRes, budgRes] = await Promise.all([
+      supabase.from("income_schedules").select("*").eq("user_id", session.userId),
+      supabase
+        .from("transactions")
+        .select("id, type, amount, transaction_date")
+        .eq("user_id", session.userId)
+        .gte("transaction_date", `${month}-01`)
+        .lte("transaction_date", endDate),
+      supabase.from("budgets").select("*").eq("user_id", session.userId),
+    ]);
+    setIncomeSchedules(schedRes.data ?? []);
+    setTransactions(txRes.data ?? []);
+    setBudgets(budgRes.data ?? []);
   }, [session]);
 
   useEffect(() => {
@@ -51,10 +89,20 @@ export default function DashboardPage() {
       return;
     }
     loadAccounts();
-  }, [session, router, loadAccounts]);
+    loadBudgetData();
+  }, [session, router, loadAccounts, loadBudgetData]);
 
   const today = new Date();
   const totalBalance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
+  const monthKey = getMonthKey(today);
+  const expectedIncome = getExpectedIncomeMonthly(incomeSchedules);
+  const actualIncome = getActualIncomeInMonth(transactions, monthKey);
+  const actualExpenses = getActualExpensesInMonth(transactions, monthKey);
+  const fixedMonthly = getFixedMonthlyTotal(budgets);
+  const remaining = getRemainingThisMonth(actualIncome, fixedMonthly, actualExpenses);
+  const weeksLeft = getWeeksLeftInMonth(today);
+  const weeklyDisposable = getWeeklyDisposable(remaining, weeksLeft);
+  const dailyDisposable = getDailyDisposable(weeklyDisposable);
 
   function handleLogout() {
     logout();
@@ -143,23 +191,25 @@ export default function DashboardPage() {
             <BudgetCard label="Saldo total" amount={totalBalance} variant="large" />
             <BudgetCard
               label="Disponible diario"
-              amount={null}
-              sublabel="Disponible para gastar"
+              amount={dailyDisposable}
+              sublabel="Para gastar hoy"
             />
             <BudgetCard
               label="Disponible semanal"
-              amount={null}
-              sublabel="Por semana"
+              amount={weeklyDisposable}
+              sublabel={`${weeksLeft} semana(s) restante(s)`}
             />
             <BudgetCard
               label="Ingresos"
-              amount={null}
-              sublabel="Registrados este mes"
+              amount={actualIncome}
+              sublabel={`de ${new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(expectedIncome)} esperados`}
+              trend={actualIncome >= expectedIncome ? "up" : "neutral"}
             />
             <BudgetCard
               label="Gastos"
-              amount={null}
+              amount={actualExpenses}
               sublabel="Este mes"
+              trend={actualExpenses > 0 ? "down" : "neutral"}
             />
           </div>
         </section>
@@ -246,7 +296,10 @@ export default function DashboardPage() {
         defaultType={quickAddType}
         accounts={accounts}
         userId={session.userId}
-        onSuccess={loadAccounts}
+        onSuccess={() => {
+          loadAccounts();
+          loadBudgetData();
+        }}
         playSound={playShutterSound}
       />
     </div>

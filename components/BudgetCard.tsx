@@ -20,9 +20,9 @@ export function BudgetCard({
 }: BudgetCardProps) {
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
-    const formatted = new Intl.NumberFormat("es-AR", {
+    const formatted = new Intl.NumberFormat("es-HN", {
       style: "currency",
-      currency: "USD",
+      currency: "HNL",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(Math.abs(value));

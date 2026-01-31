@@ -214,7 +214,7 @@ export function SettingsAccounts({ userId, accounts, onRefresh }: SettingsAccoun
                 <p className="font-medium text-foreground">{acc.name}</p>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {TYPE_LABEL[acc.type as AccountType]} ·{" "}
-                  {new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD" }).format(Number(acc.balance))}
+                  {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(Number(acc.balance))}
                 </p>
               </div>
             </div>

@@ -206,7 +206,7 @@ export function SettingsIncome({ userId, accounts, incomeSchedules, onRefresh }:
               <p className="font-medium text-foreground">{sched.name}</p>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Día {sched.day_of_month} ·{" "}
-                {new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD" }).format(Number(sched.amount))}{" "}
+                {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(Number(sched.amount))}{" "}
                 · {sched.percentage_of_total}% del total · {accountName(sched.target_account_id)}
               </p>
               {!sched.is_active && (

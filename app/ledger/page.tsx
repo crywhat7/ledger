@@ -37,9 +37,9 @@ function formatDate(dateStr: string) {
 
 function formatCurrency(value: number, type: string) {
   const n = type === "income" ? value : -value;
-  const formatted = new Intl.NumberFormat("es-AR", {
+  const formatted = new Intl.NumberFormat("es-HN", {
     style: "currency",
-    currency: "USD",
+    currency: "HNL",
     minimumFractionDigits: 2,
   }).format(Math.abs(n));
   return n >= 0 ? formatted : `-${formatted}`;

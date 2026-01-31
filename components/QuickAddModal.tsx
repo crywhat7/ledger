@@ -200,7 +200,7 @@ export function QuickAddModal({
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-serif text-2xl text-muted-foreground">
-                      $
+                      L
                     </span>
                     <Input
                       ref={amountRef}
@@ -241,7 +241,7 @@ export function QuickAddModal({
                     <option value="">Elegir cuenta</option>
                     {filteredFromAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name} — {new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD" }).format(Number(a.balance))}
+                        {a.name} — {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(Number(a.balance))}
                       </option>
                     ))}
                   </select>
