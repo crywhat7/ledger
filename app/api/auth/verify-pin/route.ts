@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerSupabase } from "@/lib/supabase/server";
 import { scryptSync, timingSafeEqual } from "crypto";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const PIN_SALT = process.env.PIN_HASH_SALT || "ledger-pin-default-change-in-production";
 
 function hashPin(pin: string): string {
@@ -20,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createServerSupabase();
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("id, username, pin_hash, display_name, api_key")

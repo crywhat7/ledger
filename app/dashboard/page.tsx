@@ -87,7 +87,7 @@ export default function DashboardPage() {
         .lte("expected_date", endDate),
     ]);
     setIncomeSchedules(schedRes.data ?? []);
-    setTransactions(txRes.data ?? []);
+    setTransactions(txRes.data as Transaction[] ?? []);
     setBudgets(budgRes.data ?? []);
     setPaidThisMonth(paidRes.data ?? []);
     setIncomeLogThisMonth(logRes.data ?? []);

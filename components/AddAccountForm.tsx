@@ -39,7 +39,7 @@ export function AddAccountForm({ userId, onSuccess, onCancel }: AddAccountFormPr
         name: trimmed,
         type,
         balance: type === "credit_card" ? -Math.abs(numBalance) : numBalance,
-        credit_limit: type === "credit_card" && numLimit > 0 ? numLimit : null,
+        credit_limit: type === "credit_card" && numLimit && numLimit > 0 ? numLimit : null,
       });
       if (err) throw err;
       onSuccess();

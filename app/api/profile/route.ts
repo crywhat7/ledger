@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { createServerSupabase } from "@/lib/supabase/server";
 
 /** PATCH: update display_name. Auth: Authorization: Bearer <api_key> */
 export async function PATCH(request: NextRequest) {
@@ -16,7 +12,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { display_name } = body as { display_name?: string };
 
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+    const supabase = createServerSupabase();
     const { data: profile, error: fetchError } = await supabase
       .from("profiles")
       .select("id")
@@ -30,7 +26,7 @@ export async function PATCH(request: NextRequest) {
     const displayNameValue = display_name == null ? null : String(display_name).trim() || null;
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ display_name: displayNameValue } as Database["public"]["Tables"]["profiles"]["Update"])
+      .update({ display_name: displayNameValue })
       .eq("id", profile.id);
 
     if (updateError) {

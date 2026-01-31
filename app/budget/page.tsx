@@ -70,7 +70,7 @@ export default function BudgetPage() {
       supabase.from("budget_month_paid").select("*").eq("user_id", session.userId).eq("month", month),
     ]);
     setIncomeSchedules(schedRes.data ?? []);
-    setTransactions(txRes.data ?? []);
+    setTransactions(txRes.data as Transaction[] ?? []);
     setBudgets(budgRes.data ?? []);
     setPaidThisMonth(paidRes.data ?? []);
     setLoading(false);

@@ -66,16 +66,16 @@ export default function LedgerPage() {
         supabase
           .from("transactions")
           .select("*")
-          .eq("user_id", session.userId)
+          .eq("user_id", session?.userId ?? "")
           .order("transaction_date", { ascending: false })
           .order("created_at", { ascending: false }),
         supabase
           .from("accounts")
           .select("id, name")
-          .eq("user_id", session.userId),
+          .eq("user_id", session?.userId ?? ""),
       ]);
       setTransactions(txRes.data ?? []);
-      setAccounts(accRes.data ?? []);
+      setAccounts(accRes.data as Account[] ?? [] as Account[]);
       setLoading(false);
     }
     load();

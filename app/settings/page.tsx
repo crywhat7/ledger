@@ -14,6 +14,7 @@ import { SettingsAccounts } from "@/components/settings/SettingsAccounts";
 import { SettingsIncome } from "@/components/settings/SettingsIncome";
 import { SettingsProfile } from "@/components/settings/SettingsProfile";
 
+
 type Tab = "cuentas" | "ingresos" | "perfil";
 
 export default function SettingsPage() {
@@ -35,11 +36,11 @@ export default function SettingsPage() {
     }
     async function load() {
       const [accRes, incRes] = await Promise.all([
-        supabase.from("accounts").select("*").eq("user_id", session.userId).order("created_at", { ascending: true }),
-        supabase.from("income_schedules").select("*").eq("user_id", session.userId).order("day_of_month"),
+        supabase.from("accounts").select("*").eq("user_id", session?.userId ?? "").order("created_at", { ascending: true }),
+        supabase.from("income_schedules").select("*").eq("user_id", session?.userId ?? "").order("day_of_month"),
       ]);
-      setAccounts(accRes.data ?? []);
-      setIncomeSchedules(incRes.data ?? []);
+      setAccounts(accRes.data as Account[] ?? [] as Account[]);
+      setIncomeSchedules(incRes.data as IncomeSchedule[] ?? [] as IncomeSchedule[]);
       setLoading(false);
     }
     load();
