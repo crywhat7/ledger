@@ -19,11 +19,13 @@ import {
   getActualIncomeInMonth,
   getActualExpensesInMonth,
   getWeeklyDisposable,
-  getDailyDisposable,
+  getDailyDisposableFromDaysLeft,
+  getDaysLeftInQuincena,
   getMonthKey,
   getQuincenaBounds,
   getQuincenaDateRange,
   getIncomeInQuincena,
+  getExpensesInQuincena,
   getFixedDueInQuincenaTotal,
   getFixedDueInQuincenaBreakdown,
   getWeeksLeftInQuincena,
@@ -129,12 +131,14 @@ export default function DashboardPage() {
   const { startDay, endDay } = getQuincenaBounds(today);
   const { start: quincenaStart, end: quincenaEnd } = getQuincenaDateRange(today);
   const incomeInQuincena = getIncomeInQuincena(transactions, quincenaStart, quincenaEnd);
+  const expensesInQuincena = getExpensesInQuincena(transactions, quincenaStart, quincenaEnd);
   const fixedDueThisQuincena = getFixedDueInQuincenaTotal(budgets, budgetDueDates, startDay, endDay);
   const fixedDueBreakdown = getFixedDueInQuincenaBreakdown(budgets, budgetDueDates, startDay, endDay);
-  const available = getAvailableFromQuincenaIncome(incomeInQuincena, fixedDueThisQuincena);
+  const available = getAvailableFromQuincenaIncome(incomeInQuincena, fixedDueThisQuincena, expensesInQuincena);
+  const daysLeftQuincena = getDaysLeftInQuincena(today, endDay);
   const weeksLeftQuincena = getWeeksLeftInQuincena(today, endDay);
   const weeklyDisposable = getWeeklyDisposable(available, weeksLeftQuincena);
-  const dailyDisposable = getDailyDisposable(weeklyDisposable);
+  const dailyDisposable = getDailyDisposableFromDaysLeft(available, daysLeftQuincena);
 
   const fixedMonthlyBudgets = budgets.filter((b) => b.period === "monthly");
   const unpaidFixedBudgets = fixedMonthlyBudgets.filter(
@@ -268,18 +272,18 @@ export default function DashboardPage() {
             <BudgetCard
               label="Disponible esta quincena"
               amount={available}
-              sublabel="Ingreso quincena − gastos fijos (libre para gastar)"
+              sublabel="Ingreso − gastos fijos − gastos ya registrados en la quincena"
               variant="large"
             />
             <BudgetCard
               label="Disponible diario"
               amount={dailyDisposable}
-              sublabel="Para gastar hoy"
+              sublabel={`Por día (${daysLeftQuincena} día(s) restante(s) en la quincena)`}
             />
             <BudgetCard
               label="Disponible semanal"
               amount={weeklyDisposable}
-              sublabel={`${weeksLeftQuincena} semana(s) en esta quincena`}
+              sublabel={`Por semana (${weeksLeftQuincena} semana(s) restante(s))`}
             />
             <BudgetCard
               label="Ingresos"

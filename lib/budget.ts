@@ -76,6 +76,22 @@ export function getIncomeInQuincena(
     .reduce((sum, t) => sum + Number(t.amount), 0);
 }
 
+/** Gastos y cargos a tarjeta registrados en una quincena (expense + cc_charge entre start y end). */
+export function getExpensesInQuincena(
+  transactions: TransactionRow[],
+  startDate: string,
+  endDate: string
+): number {
+  return transactions
+    .filter(
+      (t) =>
+        (t.type === "expense" || t.type === "cc_charge") &&
+        t.transaction_date >= startDate &&
+        t.transaction_date <= endDate
+    )
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+}
+
 /**
  * Monto total que debés pagar en esta quincena por gastos fijos (todos los que tienen
  * al menos una fecha de pago en [startDay, endDay]). Como en Excel: sueldo − esto = disponible.
@@ -148,27 +164,41 @@ export function getFixedDueInQuincenaUnpaid(
   return total;
 }
 
-/** Semanas restantes en la quincena actual (desde hoy hasta endDay). Mínimo 1. */
-export function getWeeksLeftInQuincena(date: Date, endDay: number): number {
+/** Días restantes en la quincena (incluye hoy). Mínimo 1. */
+export function getDaysLeftInQuincena(date: Date, endDay: number): number {
   const today = date.getDate();
-  const daysLeft = endDay - today + 1;
+  return Math.max(1, endDay - today + 1);
+}
+
+/** Semanas restantes en la quincena (según días que faltan). Mínimo 1. */
+export function getWeeksLeftInQuincena(date: Date, endDay: number): number {
+  const daysLeft = getDaysLeftInQuincena(date, endDay);
   return Math.max(1, Math.ceil(daysLeft / 7));
 }
 
-/** Disponible para gastar en la quincena = ingreso de esta quincena − gastos fijos de esta quincena (como Excel). */
+/**
+ * Disponible para gastar en la quincena = ingreso de esta quincena − gastos fijos de esta quincena
+ * − gastos/cargos ya registrados en esta quincena (lo que ya gastaste).
+ */
 export function getAvailableFromQuincenaIncome(
   incomeInQuincena: number,
-  fixedDueThisQuincenaTotal: number
+  fixedDueThisQuincenaTotal: number,
+  expensesInQuincena: number = 0
 ): number {
-  return incomeInQuincena - fixedDueThisQuincenaTotal;
+  return incomeInQuincena - fixedDueThisQuincenaTotal - expensesInQuincena;
 }
 
-/** Weekly disposable = available / weeks left (at least 1 week) */
+/** Disponible por semana = disponible ÷ semanas que faltan en la quincena. */
 export function getWeeklyDisposable(available: number, weeksLeft: number): number {
   return weeksLeft > 0 ? available / weeksLeft : 0;
 }
 
-/** Daily disposable = weekly disposable / 7 */
+/** Disponible por día = disponible ÷ días que faltan en la quincena (si no gastás hoy, tenés más mañana). */
+export function getDailyDisposableFromDaysLeft(available: number, daysLeft: number): number {
+  return daysLeft > 0 ? available / daysLeft : 0;
+}
+
+/** Daily disposable = weekly / 7 (legacy, para página Presupuesto) */
 export function getDailyDisposable(weeklyDisposable: number): number {
   return weeklyDisposable / 7;
 }
