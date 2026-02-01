@@ -18,11 +18,16 @@ import {
   getExpectedIncomeMonthly,
   getActualIncomeInMonth,
   getActualExpensesInMonth,
-  getRemainingThisMonth,
   getWeeklyDisposable,
   getDailyDisposable,
-  getWeeksLeftInMonth,
   getMonthKey,
+  getQuincenaBounds,
+  getQuincenaDateRange,
+  getIncomeInQuincena,
+  getFixedDueInQuincenaTotal,
+  getFixedDueInQuincenaBreakdown,
+  getWeeksLeftInQuincena,
+  getAvailableFromQuincenaIncome,
 } from "@/lib/budget";
 import type { IncomeSchedule } from "@/types/database";
 import type { Budget } from "@/types/database";
@@ -46,6 +51,7 @@ export default function DashboardPage() {
   const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [budgetDueDates, setBudgetDueDates] = useState<{ budget_id: string; day_of_month: number; percentage: number }[]>([]);
   const [paidThisMonth, setPaidThisMonth] = useState<{ budget_id: string }[]>([]);
   const [incomeLogThisMonth, setIncomeLogThisMonth] = useState<{ expected_date: string }[]>([]);
 
@@ -88,9 +94,17 @@ export default function DashboardPage() {
     ]);
     setIncomeSchedules(schedRes.data ?? []);
     setTransactions(txRes.data as Transaction[] ?? []);
-    setBudgets(budgRes.data ?? []);
+    const budgList = budgRes.data ?? [];
+    setBudgets(budgList);
     setPaidThisMonth(paidRes.data ?? []);
     setIncomeLogThisMonth(logRes.data ?? []);
+    const budgetIds = budgList.map((b: { id: string }) => b.id);
+    if (budgetIds.length > 0) {
+      const dueRes = await supabase.from("budget_due_dates").select("budget_id, day_of_month, percentage").in("budget_id", budgetIds);
+      setBudgetDueDates(dueRes.data ?? []);
+    } else {
+      setBudgetDueDates([]);
+    }
   }, [session]);
 
   useEffect(() => {
@@ -112,10 +126,14 @@ export default function DashboardPage() {
   const expectedIncome = getExpectedIncomeMonthly(incomeSchedules);
   const actualIncome = getActualIncomeInMonth(transactions, monthKey);
   const actualExpenses = getActualExpensesInMonth(transactions, monthKey);
-  // Disponible = ingresos reales − gastos reales (no restamos gastos fijos; cuando los pagás, entran como gasto normal)
-  const remaining = getRemainingThisMonth(actualIncome, 0, actualExpenses);
-  const weeksLeft = getWeeksLeftInMonth(today);
-  const weeklyDisposable = getWeeklyDisposable(remaining, weeksLeft);
+  const { startDay, endDay } = getQuincenaBounds(today);
+  const { start: quincenaStart, end: quincenaEnd } = getQuincenaDateRange(today);
+  const incomeInQuincena = getIncomeInQuincena(transactions, quincenaStart, quincenaEnd);
+  const fixedDueThisQuincena = getFixedDueInQuincenaTotal(budgets, budgetDueDates, startDay, endDay);
+  const fixedDueBreakdown = getFixedDueInQuincenaBreakdown(budgets, budgetDueDates, startDay, endDay);
+  const available = getAvailableFromQuincenaIncome(incomeInQuincena, fixedDueThisQuincena);
+  const weeksLeftQuincena = getWeeksLeftInQuincena(today, endDay);
+  const weeklyDisposable = getWeeklyDisposable(available, weeksLeftQuincena);
   const dailyDisposable = getDailyDisposable(weeklyDisposable);
 
   const fixedMonthlyBudgets = budgets.filter((b) => b.period === "monthly");
@@ -217,8 +235,42 @@ export default function DashboardPage() {
           <h3 className="mb-4 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
             Este mes
           </h3>
+          {incomeInQuincena === 0 && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Registrá el ingreso de esta quincena para ver tu disponible (ingreso − gastos fijos de la quincena).
+            </p>
+          )}
+          {fixedDueBreakdown.length > 0 && (
+            <div className="mb-4 rounded border border-border bg-muted/30 px-4 py-3">
+              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Gastos fijos que entran en esta quincena (días {startDay}–{endDay})
+              </p>
+              <ul className="space-y-1 text-sm">
+                {fixedDueBreakdown.map((item, i) => (
+                  <li key={i} className="flex justify-between">
+                    <span className="text-foreground">{item.name}</span>
+                    <span className="font-medium tabular-nums text-foreground">
+                      {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(item.amount)}
+                    </span>
+                  </li>
+                ))}
+                <li className="flex justify-between border-t border-border pt-2 mt-2 font-medium">
+                  <span>Total restado</span>
+                  <span className="tabular-nums">
+                    {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(fixedDueThisQuincena)}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <BudgetCard label="Saldo total" amount={totalBalance} variant="large" />
+            <BudgetCard
+              label="Disponible esta quincena"
+              amount={available}
+              sublabel="Ingreso quincena − gastos fijos (libre para gastar)"
+              variant="large"
+            />
             <BudgetCard
               label="Disponible diario"
               amount={dailyDisposable}
@@ -227,7 +279,7 @@ export default function DashboardPage() {
             <BudgetCard
               label="Disponible semanal"
               amount={weeklyDisposable}
-              sublabel={`${weeksLeft} semana(s) restante(s)`}
+              sublabel={`${weeksLeftQuincena} semana(s) en esta quincena`}
             />
             <BudgetCard
               label="Ingresos"

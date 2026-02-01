@@ -144,6 +144,23 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["budget_month_paid"]["Insert"]>;
       };
+      budget_due_dates: {
+        Row: {
+          id: string;
+          budget_id: string;
+          day_of_month: number;
+          percentage: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          budget_id: string;
+          day_of_month: number;
+          percentage: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["budget_due_dates"]["Insert"]>;
+      };
       planned_expenses: {
         Row: {
           id: string;
@@ -226,5 +243,6 @@ export type Account = Database["public"]["Tables"]["accounts"]["Row"];
 export type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 export type Budget = Database["public"]["Tables"]["budgets"]["Row"];
 export type BudgetMonthPaid = Database["public"]["Tables"]["budget_month_paid"]["Row"];
+export type BudgetDueDate = Database["public"]["Tables"]["budget_due_dates"]["Row"];
 export type PlannedExpense = Database["public"]["Tables"]["planned_expenses"]["Row"];
 export type IncomeSchedule = Database["public"]["Tables"]["income_schedules"]["Row"];

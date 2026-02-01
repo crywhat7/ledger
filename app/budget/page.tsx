@@ -36,9 +36,14 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", amount: "" });
+  const [form, setForm] = useState<{
+    name: string;
+    amount: string;
+    dueDates: { day_of_month: number; percentage: number }[];
+  }>({ name: "", amount: "", dueDates: [{ day_of_month: 1, percentage: 100 }] });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
+  const [budgetDueDates, setBudgetDueDates] = useState<{ budget_id: string; day_of_month: number; percentage: number }[]>([]);
 
   useEffect(() => {
     hydrate();
@@ -71,8 +76,16 @@ export default function BudgetPage() {
     ]);
     setIncomeSchedules(schedRes.data ?? []);
     setTransactions(txRes.data as Transaction[] ?? []);
-    setBudgets(budgRes.data ?? []);
+    const budgList = budgRes.data ?? [];
+    setBudgets(budgList);
     setPaidThisMonth(paidRes.data ?? []);
+    const budgetIds = budgList.map((b: { id: string }) => b.id);
+    if (budgetIds.length > 0) {
+      const dueRes = await supabase.from("budget_due_dates").select("budget_id, day_of_month, percentage").in("budget_id", budgetIds);
+      setBudgetDueDates(dueRes.data ?? []);
+    } else {
+      setBudgetDueDates([]);
+    }
     setLoading(false);
   }
 
@@ -92,13 +105,24 @@ export default function BudgetPage() {
     setFormError("");
     const name = form.name.trim();
     const amount = parseFloat(form.amount.replace(",", "."));
+    const dueDates = form.dueDates.filter((d) => d.day_of_month >= 1 && d.day_of_month <= 31 && d.percentage > 0);
+    const totalPct = dueDates.reduce((s, d) => s + d.percentage, 0);
     if (!name || isNaN(amount) || amount < 0) {
       setFormError("Nombre y monto válido requeridos");
+      return;
+    }
+    if (dueDates.length === 0) {
+      setFormError("Agregá al menos una fecha de pago");
+      return;
+    }
+    if (Math.abs(totalPct - 100) > 0.01) {
+      setFormError(`Los porcentajes deben sumar 100% (ahora suman ${totalPct.toFixed(0)}%)`);
       return;
     }
     if (!session) return;
     setFormLoading(true);
     try {
+      let id = budgetId;
       if (budgetId) {
         await supabase
           .from("budgets")
@@ -106,18 +130,33 @@ export default function BudgetPage() {
           .eq("id", budgetId)
           .eq("user_id", session.userId);
       } else {
-        await supabase.from("budgets").insert({
-          user_id: session.userId,
-          name,
-          amount,
-          period: "monthly",
-          is_fixed: true,
-        });
+        const { data: inserted } = await supabase
+          .from("budgets")
+          .insert({
+            user_id: session.userId,
+            name,
+            amount,
+            period: "monthly",
+            is_fixed: true,
+          })
+          .select("id")
+          .single();
+        id = inserted?.id ?? null;
+      }
+      if (id) {
+        await supabase.from("budget_due_dates").delete().eq("budget_id", id);
+        for (const d of dueDates) {
+          await supabase.from("budget_due_dates").insert({
+            budget_id: id,
+            day_of_month: d.day_of_month,
+            percentage: d.percentage,
+          });
+        }
       }
       await load();
       setEditingId(null);
       setAdding(false);
-      setForm({ name: "", amount: "" });
+      setForm({ name: "", amount: "", dueDates: [{ day_of_month: 1, percentage: 100 }] });
     } catch {
       setFormError("No se pudo guardar");
     } finally {
@@ -143,14 +182,19 @@ export default function BudgetPage() {
   function openEdit(b: Budget) {
     setEditingId(b.id);
     setAdding(false);
-    setForm({ name: b.name, amount: String(b.amount) });
+    const due = budgetDueDates.filter((d) => d.budget_id === b.id);
+    setForm({
+      name: b.name,
+      amount: String(b.amount),
+      dueDates: due.length > 0 ? due.map((d) => ({ day_of_month: d.day_of_month, percentage: Number(d.percentage) })) : [{ day_of_month: 1, percentage: 100 }],
+    });
     setFormError("");
   }
 
   function openAdd() {
     setAdding(true);
     setEditingId(null);
-    setForm({ name: "", amount: "" });
+    setForm({ name: "", amount: "", dueDates: [{ day_of_month: 1, percentage: 100 }] });
     setFormError("");
   }
 
@@ -158,6 +202,24 @@ export default function BudgetPage() {
     setAdding(false);
     setEditingId(null);
     setFormError("");
+  }
+
+  function addDueDate() {
+    setForm((f) => ({ ...f, dueDates: [...f.dueDates, { day_of_month: 15, percentage: 0 }] }));
+  }
+
+  function removeDueDate(index: number) {
+    setForm((f) => ({
+      ...f,
+      dueDates: f.dueDates.filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateDueDate(index: number, field: "day_of_month" | "percentage", value: number) {
+    setForm((f) => ({
+      ...f,
+      dueDates: f.dueDates.map((d, i) => (i === index ? { ...d, [field]: value } : d)),
+    }));
   }
 
   function isPaidThisMonth(budgetId: string): boolean {
@@ -331,6 +393,54 @@ export default function BudgetPage() {
                           placeholder="0"
                           className="h-12 border-border bg-transparent font-serif"
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Fechas de pago en el mes (quincena 1–15, 16–fin)
+                          </label>
+                          <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={addDueDate}>
+                            + Fecha
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Día del mes (1–31) y % que se paga ese día. La suma debe dar 100%.
+                        </p>
+                        <ul className="space-y-2">
+                          {form.dueDates.map((d, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={31}
+                                value={d.day_of_month || ""}
+                                onChange={(e) => updateDueDate(i, "day_of_month", parseInt(e.target.value, 10) || 1)}
+                                className="h-10 w-20 border-border bg-transparent"
+                                placeholder="Día"
+                              />
+                              <span className="text-muted-foreground">→</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                value={d.percentage || ""}
+                                onChange={(e) => updateDueDate(i, "percentage", parseFloat(e.target.value) || 0)}
+                                className="h-10 w-24 border-border bg-transparent"
+                                placeholder="%"
+                              />
+                              <span className="text-muted-foreground">%</span>
+                              {form.dueDates.length > 1 && (
+                                <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0 text-destructive" onClick={() => removeDueDate(i)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="text-xs text-muted-foreground">
+                          Suma: {form.dueDates.reduce((s, d) => s + d.percentage, 0).toFixed(0)}%
+                        </p>
                       </div>
                       {formError && <p className="text-sm text-destructive">{formError}</p>}
                       <div className="flex gap-2">

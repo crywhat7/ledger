@@ -95,6 +95,17 @@ CREATE TABLE IF NOT EXISTS budget_month_paid (
 );
 CREATE INDEX IF NOT EXISTS idx_budget_month_paid_user_month ON budget_month_paid(user_id, month);
 
+-- FECHAS Y PORCENTAJES POR PAGO DE CADA GASTO FIJO (quincena 1-15, 16-fin)
+CREATE TABLE IF NOT EXISTS budget_due_dates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  budget_id UUID NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+  day_of_month INTEGER NOT NULL CHECK (day_of_month >= 1 AND day_of_month <= 31),
+  percentage NUMERIC(5, 2) NOT NULL CHECK (percentage > 0 AND percentage <= 100),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(budget_id, day_of_month)
+);
+CREATE INDEX IF NOT EXISTS idx_budget_due_dates_budget_id ON budget_due_dates(budget_id);
+
 -- PLANNED EXPENSES
 CREATE TABLE IF NOT EXISTS planned_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -168,6 +179,7 @@ ALTER TABLE income_schedules DISABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE budgets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE budget_month_paid DISABLE ROW LEVEL SECURITY;
+ALTER TABLE budget_due_dates DISABLE ROW LEVEL SECURITY;
 ALTER TABLE planned_expenses DISABLE ROW LEVEL SECURITY;
 ALTER TABLE weekly_rollovers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_decisions DISABLE ROW LEVEL SECURITY;
