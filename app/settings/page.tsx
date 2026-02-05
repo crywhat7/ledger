@@ -13,6 +13,7 @@ import type { IncomeSchedule } from "@/types/database";
 import { SettingsAccounts } from "@/components/settings/SettingsAccounts";
 import { SettingsIncome } from "@/components/settings/SettingsIncome";
 import { SettingsProfile } from "@/components/settings/SettingsProfile";
+import { SettingsNotifications } from "@/components/settings/SettingsNotifications";
 
 
 type Tab = "cuentas" | "ingresos" | "perfil";
@@ -157,10 +158,18 @@ export default function SettingsPage() {
               />
             )}
             {tab === "perfil" && (
-              <SettingsProfile
-                session={session}
-                onUpdate={() => hydrate()}
-              />
+              <div className="space-y-8">
+                <SettingsProfile
+                  session={session}
+                  onUpdate={() => hydrate()}
+                />
+                <div>
+                  <h3 className="mb-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Notificaciones
+                  </h3>
+                  <SettingsNotifications userId={session.userId} />
+                </div>
+              </div>
             )}
           </motion.div>
         )}

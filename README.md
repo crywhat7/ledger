@@ -12,6 +12,10 @@ PWA de finanzas personales con auth custom (usuario + PIN), Libro Diario, cuenta
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `PIN_HASH_SALT` (opcional)
    - `VAULT_MASTER_KEY` (default: 213356)
+   - **Notificaciones push** (opcional): generar claves VAPID con `npx web-push generate-vapid-keys` y definir:
+     - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (clave pública)
+     - `VAPID_PRIVATE_KEY` (clave privada, solo servidor)
+   - **Cron** (Vercel): definir `CRON_SECRET` en el proyecto para que las rutas `/api/cron/notify-morning` y `/api/cron/notify-evening` solo acepten llamadas de Vercel. Horarios: 7:30 (disponible por día) y 21:00 (disponible por semana), hora Honduras (UTC-6).
 
 3. **Sonido al registrar**: Opcional. Agregar un archivo `/public/click.mp3` (sonido tipo “shutter”) para que suene al guardar un movimiento. Si no existe, no se reproduce nada.
 
