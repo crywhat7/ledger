@@ -1,4 +1,4 @@
-const CACHE = "ledger-v1";
+const CACHE = "ledger-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -12,22 +12,36 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  let data = { title: "Ledger", body: "", url: "/dashboard" };
-  try {
-    data = event.data.json();
-  } catch (_) {
-    data.body = event.data.text();
-  }
-  const options = {
-    body: data.body || "",
-    icon: "/file.svg",
-    badge: "/file.svg",
-    data: { url: data.url || "/dashboard" },
-    tag: "ledger-notification",
-    renotify: true,
-  };
-  event.waitUntil(self.registration.showNotification(data.title || "Ledger", options));
+  const promise = (async () => {
+    let data = { title: "Ledger", body: "", url: "/dashboard" };
+    if (event.data) {
+      try {
+        const raw = event.data.json();
+        if (raw && typeof raw === "object") data = { ...data, ...raw };
+        else data.body = typeof raw === "string" ? raw : event.data.text() || "";
+      } catch (_) {
+        try {
+          data.body = event.data.text() || "";
+        } catch (_) {}
+      }
+    }
+    const options = {
+      body: data.body || "Nueva notificación",
+      icon: "/file.svg",
+      badge: "/file.svg",
+      data: { url: data.url || "/dashboard" },
+      tag: "ledger-notification",
+      renotify: true,
+      requireInteraction: true,
+      silent: false,
+    };
+    try {
+      await self.registration.showNotification(data.title || "Ledger", options);
+    } catch (err) {
+      console.error("[Ledger SW] showNotification failed:", err);
+    }
+  })();
+  event.waitUntil(promise);
 });
 
 self.addEventListener("notificationclick", (event) => {

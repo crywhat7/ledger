@@ -25,8 +25,11 @@ function arrayBufferToBase64Url(buffer: ArrayBuffer | null): string {
 
 type Props = { userId: string };
 
+type PermissionStatus = "granted" | "denied" | "default" | null;
+
 export function SettingsNotifications({ userId }: Props) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [permission, setPermission] = useState<PermissionStatus>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testMessage, setTestMessage] = useState<string | null>(null);
@@ -38,6 +41,17 @@ export function SettingsNotifications({ userId }: Props) {
       .then((data) => setEnabled(Boolean(data.enabled)))
       .catch(() => setEnabled(false));
   }, [userId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    setPermission(
+      Notification.permission === "granted"
+        ? "granted"
+        : Notification.permission === "denied"
+          ? "denied"
+          : "default"
+    );
+  }, [enabled]);
 
   async function subscribe() {
     if (!VAPID_PUBLIC) {
@@ -92,6 +106,7 @@ export function SettingsNotifications({ userId }: Props) {
         throw new Error(data.error || "Error al activar");
       }
       setEnabled(true);
+      setPermission("granted");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al activar notificaciones.");
     } finally {
@@ -127,7 +142,10 @@ export function SettingsNotifications({ userId }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Recibí un recordatorio a las 7:30 (disponible por día) y a las 21:00 (disponible por semana) en este dispositivo o en el celular si abrís la app desde el navegador.
+        Recibí un recordatorio a las 7:30 (disponible por día) y a las 21:00 (disponible por semana).
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Si no ves la notificación en pantalla: 1) Revisá el centro de notificaciones de Windows (ícono junto al reloj). 2) Configuración de Windows → Sistema → Notificaciones → asegurate que Chrome y &quot;No molestar&quot; no estén silenciando. 3) En Chrome: configuración → Privacidad → Configuración de sitios → Notificaciones → que este sitio esté en &quot;Permitir&quot;.
       </p>
       {error && (
         <p className="text-sm text-red-600" role="alert">
@@ -135,45 +153,67 @@ export function SettingsNotifications({ userId }: Props) {
         </p>
       )}
       {enabled ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <Bell className="h-5 w-5 text-foreground" />
-          <span className="text-sm text-foreground">Notificaciones activadas</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={unsubscribe}
-            disabled={loading}
-          >
-            Desactivar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loading}
-            onClick={async () => {
-              setLoading(true);
-              setError(null);
-              setTestMessage(null);
-              try {
-                const res = await fetch("/api/notifications/test", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ userId }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.error || "Error al enviar");
-                setTestMessage("Enviada. Revisá la esquina de la pantalla o el centro de notificaciones.");
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Bell className="h-5 w-5 text-foreground" />
+            <span className="text-sm text-foreground">Notificaciones activadas</span>
+            {permission !== null && (
+              <span
+                className={`text-xs ${
+                  permission === "granted"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                Permiso: {permission === "granted" ? "permitido" : permission === "denied" ? "denegado" : "no decidido"}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={unsubscribe}
+              disabled={loading}
+            >
+              Desactivar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={async () => {
+                if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+                  setError("El permiso de notificaciones no está permitido. Tocá el candado (o la i) en la barra de direcciones → Configuración del sitio → Notificaciones → Permitir.");
+                  return;
+                }
+                setLoading(true);
                 setError(null);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Error al enviar prueba");
                 setTestMessage(null);
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            {loading ? "Enviando…" : "Enviar notificación de prueba"}
-          </Button>
+                try {
+                  const res = await fetch("/api/notifications/test", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(data.error || "Error al enviar");
+                  setTestMessage("Enviada. Revisá la esquina de la pantalla o el centro de notificaciones. Si no ves nada: 1) Minimizá la ventana o abrí otra pestaña. 2) Cerrá todas las pestañas de la app y volvé a abrirla (actualiza el Service Worker).");
+                  setError(null);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Error al enviar prueba");
+                  setTestMessage(null);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              {loading ? "Enviando…" : "Enviar notificación de prueba"}
+            </Button>
+          </div>
+          {permission === "denied" && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              El navegador tiene las notificaciones denegadas para este sitio. Sin permiso no vas a recibir ninguna. Abrí la configuración del sitio (candado o i en la barra de direcciones) y cambiá Notificaciones a &quot;Permitir&quot;.
+            </p>
+          )}
         </div>
       ) : (
         <Button
