@@ -116,17 +116,18 @@ export function getFixedDueInQuincenaTotal(
 }
 
 /**
- * Lista de gastos fijos que entran en esta quincena con su monto (nombre + monto).
- * Para mostrar en el dashboard "qué gastos fijos está metiendo" en el cálculo.
+ * Lista de gastos fijos que entran en esta quincena con su monto y si ya los pagaste.
+ * Para mostrar en el dashboard con ✓ en los pagados.
  */
 export function getFixedDueInQuincenaBreakdown(
   budgets: Budget[],
   dueDates: DueDateRow[],
   startDay: number,
-  endDay: number
-): { name: string; amount: number }[] {
+  endDay: number,
+  paidBudgetIdsThisMonth: Set<string>
+): { name: string; amount: number; paid: boolean }[] {
   const fixedBudgets = budgets.filter((b) => b.period === "monthly");
-  const result: { name: string; amount: number }[] = [];
+  const result: { name: string; amount: number; paid: boolean }[] = [];
   for (const b of fixedBudgets) {
     const budgetDueDates = dueDates.filter(
       (d) => d.budget_id === b.id && d.day_of_month >= startDay && d.day_of_month <= endDay
@@ -134,7 +135,7 @@ export function getFixedDueInQuincenaBreakdown(
     if (budgetDueDates.length === 0) continue;
     const pct = budgetDueDates.reduce((s, d) => s + Number(d.percentage), 0);
     const amount = (Number(b.amount) * pct) / 100;
-    result.push({ name: b.name, amount });
+    result.push({ name: b.name, amount, paid: paidBudgetIdsThisMonth.has(b.id) });
   }
   return result;
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus, LogOut, Settings, BookOpen, Calendar } from "lucide-react";
+import { Plus, LogOut, Settings, BookOpen, Calendar, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
 import { IncomeRequiredAlert } from "@/components/IncomeRequiredAlert";
@@ -26,7 +26,7 @@ import {
   getQuincenaDateRange,
   getIncomeInQuincena,
   getExpensesInQuincena,
-  getFixedDueInQuincenaTotal,
+  getFixedDueInQuincenaUnpaid,
   getFixedDueInQuincenaBreakdown,
   getWeeksLeftInQuincena,
   getAvailableFromQuincenaIncome,
@@ -130,10 +130,11 @@ export default function DashboardPage() {
   const actualExpenses = getActualExpensesInMonth(transactions, monthKey);
   const { startDay, endDay } = getQuincenaBounds(today);
   const { start: quincenaStart, end: quincenaEnd } = getQuincenaDateRange(today);
+  const paidBudgetIds = new Set(paidThisMonth.map((p) => p.budget_id));
   const incomeInQuincena = getIncomeInQuincena(transactions, quincenaStart, quincenaEnd);
   const expensesInQuincena = getExpensesInQuincena(transactions, quincenaStart, quincenaEnd);
-  const fixedDueThisQuincena = getFixedDueInQuincenaTotal(budgets, budgetDueDates, startDay, endDay);
-  const fixedDueBreakdown = getFixedDueInQuincenaBreakdown(budgets, budgetDueDates, startDay, endDay);
+  const fixedDueThisQuincena = getFixedDueInQuincenaUnpaid(budgets, budgetDueDates, startDay, endDay, paidBudgetIds);
+  const fixedDueBreakdown = getFixedDueInQuincenaBreakdown(budgets, budgetDueDates, startDay, endDay, paidBudgetIds);
   const available = getAvailableFromQuincenaIncome(incomeInQuincena, fixedDueThisQuincena, expensesInQuincena);
   const daysLeftQuincena = getDaysLeftInQuincena(today, endDay);
   const weeksLeftQuincena = getWeeksLeftInQuincena(today, endDay);
@@ -251,15 +252,26 @@ export default function DashboardPage() {
               </p>
               <ul className="space-y-1 text-sm">
                 {fixedDueBreakdown.map((item, i) => (
-                  <li key={i} className="flex justify-between">
-                    <span className="text-foreground">{item.name}</span>
-                    <span className="font-medium tabular-nums text-foreground">
+                  <li
+                    key={i}
+                    className={`flex items-center justify-between gap-2 ${item.paid ? "text-muted-foreground" : ""}`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      {item.paid ? (
+                        <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
+                      ) : (
+                        <span className="inline-block h-4 w-4 shrink-0" aria-hidden />
+                      )}
+                      <span className={item.paid ? "line-through" : ""}>{item.name}</span>
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">
                       {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(item.amount)}
+                      {item.paid && " (pagado)"}
                     </span>
                   </li>
                 ))}
                 <li className="flex justify-between border-t border-border pt-2 mt-2 font-medium">
-                  <span>Total restado</span>
+                  <span>Total restado (solo no pagados)</span>
                   <span className="tabular-nums">
                     {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(fixedDueThisQuincena)}
                   </span>
