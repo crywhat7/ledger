@@ -58,9 +58,12 @@ export function SettingsNotifications({ userId }: Props) {
         return;
       }
       const reg = await navigator.serviceWorker.ready;
+      const keyBytes = urlBase64ToUint8Array(VAPID_PUBLIC);
+      const keyBuffer = new ArrayBuffer(keyBytes.length);
+      new Uint8Array(keyBuffer).set(keyBytes);
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+        applicationServerKey: new Uint8Array(keyBuffer),
       });
       const subscriptionJson = sub.toJSON?.() ?? {
         endpoint: sub.endpoint,

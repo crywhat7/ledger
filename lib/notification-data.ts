@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Budget } from "@/types/database";
 import {
   getQuincenaBounds,
   getQuincenaDateRange,
@@ -14,7 +15,6 @@ import {
 } from "@/lib/budget";
 
 type TransactionRow = { type: string; amount: number; transaction_date: string };
-type BudgetRow = { id: string; period: string; amount: number };
 type DueDateRow = { budget_id: string; day_of_month: number; percentage: number };
 
 export async function getDisposableForUser(
@@ -33,7 +33,7 @@ export async function getDisposableForUser(
       .eq("user_id", userId)
       .gte("transaction_date", `${monthKey}-01`)
       .lte("transaction_date", endDate),
-    supabase.from("budgets").select("id, period, amount").eq("user_id", userId),
+    supabase.from("budgets").select("*").eq("user_id", userId),
     supabase.from("budget_due_dates").select("budget_id, day_of_month, percentage"),
     supabase
       .from("budget_month_paid")
@@ -43,7 +43,7 @@ export async function getDisposableForUser(
   ]);
 
   const transactions = (txRes.data ?? []) as TransactionRow[];
-  const budgets = (budgetsRes.data ?? []) as BudgetRow[];
+  const budgets = (budgetsRes.data ?? []) as Budget[];
   const dueDates = (dueRes.data ?? []) as DueDateRow[];
   const paidThisMonth = paidRes.data ?? [];
   const paidBudgetIds = new Set(paidThisMonth.map((p: { budget_id: string }) => p.budget_id));
@@ -53,7 +53,7 @@ export async function getDisposableForUser(
   const incomeInQuincena = getIncomeInQuincena(transactions, quincenaStart, quincenaEnd);
   const expensesInQuincena = getExpensesInQuincena(transactions, quincenaStart, quincenaEnd);
   const fixedDueThisQuincena = getFixedDueInQuincenaUnpaid(
-    budgets as { id: string; period: string; amount: number }[],
+    budgets,
     dueDates,
     startDay,
     endDay,
