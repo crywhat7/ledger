@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus, LogOut, Settings, BookOpen, Calendar, Check } from "lucide-react";
+import { Plus, LogOut, Settings, BookOpen, Calendar, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
 import { IncomeRequiredAlert } from "@/components/IncomeRequiredAlert";
@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { session, hydrate, logout } = useSessionStore();
   const [showIncomeAlertDismissed, setShowIncomeAlertDismissed] = useState(false);
+  const [verMasOpen, setVerMasOpen] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddType, setQuickAddType] = useState<"income" | "expense" | "transfer" | "cc_charge" | "cc_payment">("expense");
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -237,165 +238,164 @@ export default function DashboardPage() {
         )}
 
         <section className="mb-8">
-          <h3 className="mb-4 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-            Este mes
-          </h3>
           {incomeInQuincena === 0 && (
             <p className="mb-4 text-sm text-muted-foreground">
-              Registrá el ingreso de esta quincena para ver tu disponible (ingreso − gastos fijos de la quincena).
+              Registrá el ingreso de esta quincena para ver tu disponible.
             </p>
-          )}
-          {fixedDueBreakdown.length > 0 && (
-            <div className="mb-4 rounded border border-border bg-muted/30 px-4 py-3">
-              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                Gastos fijos que entran en esta quincena (días {startDay}–{endDay})
-              </p>
-              <ul className="space-y-1 text-sm">
-                {fixedDueBreakdown.map((item, i) => (
-                  <li
-                    key={i}
-                    className={`flex items-center justify-between gap-2 ${item.paid ? "text-muted-foreground" : ""}`}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      {item.paid ? (
-                        <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
-                      ) : (
-                        <span className="inline-block h-4 w-4 shrink-0" aria-hidden />
-                      )}
-                      <span className={item.paid ? "line-through" : ""}>{item.name}</span>
-                    </span>
-                    <span className="shrink-0 font-medium tabular-nums">
-                      {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(item.amount)}
-                      {item.paid && " (pagado)"}
-                    </span>
-                  </li>
-                ))}
-                <li className="flex justify-between border-t border-border pt-2 mt-2 font-medium">
-                  <span>Total restado (solo no pagados)</span>
-                  <span className="tabular-nums">
-                    {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(fixedDueThisQuincena)}
-                  </span>
-                </li>
-              </ul>
-            </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <BudgetCard label="Saldo total" amount={totalBalance} variant="large" />
             <BudgetCard
               label="Disponible esta quincena"
               amount={available}
-              sublabel="Ingreso − gastos fijos − gastos ya registrados en la quincena"
+              sublabel="Libre para gastar"
               variant="large"
             />
             <BudgetCard
               label="Disponible diario"
               amount={dailyDisposable}
-              sublabel={`Por día (${daysLeftQuincena} día(s) restante(s) en la quincena)`}
+              sublabel={`${daysLeftQuincena} día(s) restante(s)`}
             />
             <BudgetCard
               label="Disponible semanal"
               amount={weeklyDisposable}
-              sublabel={`Por semana (${weeksLeftQuincena} semana(s) restante(s))`}
-            />
-            <BudgetCard
-              label="Ingresos"
-              amount={actualIncome}
-              sublabel={`de ${new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(expectedIncome)} esperados`}
-              trend={actualIncome >= expectedIncome ? "up" : "neutral"}
-            />
-            <BudgetCard
-              label="Gastos"
-              amount={actualExpenses}
-              sublabel="Este mes"
-              trend={actualExpenses > 0 ? "down" : "neutral"}
+              sublabel={`${weeksLeftQuincena} semana(s) restante(s)`}
             />
           </div>
-        </section>
 
-        {unpaidFixedBudgets.length > 0 && (
-          <section className="mb-8">
-            <h3 className="mb-4 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              Gastos fijos no pagados este mes
-            </h3>
-            <div className="border border-border bg-background">
-              <ul className="divide-y divide-border">
-                {unpaidFixedBudgets.map((b) => (
-                  <li
-                    key={b.id}
-                    className="flex items-center justify-between px-4 py-3 text-sm"
-                  >
-                    <span className="text-foreground">{b.name}</span>
-                    <span className="font-medium text-foreground">
-                      {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(Number(b.amount))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-                Al registrar el pago en Agregar movimiento, marcá “¿Es para un gasto fijo?” y elegí uno para marcarlo como pagado.
-              </p>
-            </div>
-          </section>
-        )}
+          <div className="mt-6 border border-border">
+            <button
+              type="button"
+              onClick={() => setVerMasOpen((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-muted/50"
+              aria-expanded={verMasOpen}
+            >
+              <span>Ver más</span>
+              {verMasOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {verMasOpen && (
+              <div className="border-t border-border px-4 py-4">
+                {fixedDueBreakdown.length > 0 && (
+                  <div className="mb-6">
+                    <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Gastos fijos esta quincena (días {startDay}–{endDay})
+                    </p>
+                    <ul className="space-y-1 text-sm">
+                      {fixedDueBreakdown.map((item, i) => (
+                        <li
+                          key={i}
+                          className={`flex items-center justify-between gap-2 ${item.paid ? "text-muted-foreground" : ""}`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            {item.paid ? (
+                              <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
+                            ) : (
+                              <span className="inline-block h-4 w-4 shrink-0" aria-hidden />
+                            )}
+                            <span className={item.paid ? "line-through" : ""}>{item.name}</span>
+                          </span>
+                          <span className="shrink-0 font-medium tabular-nums">
+                            {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(item.amount)}
+                            {item.paid && " (pagado)"}
+                          </span>
+                        </li>
+                      ))}
+                      <li className="flex justify-between border-t border-border pt-2 mt-2 font-medium">
+                        <span>Total restado (solo no pagados)</span>
+                        <span className="tabular-nums">
+                          {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(fixedDueThisQuincena)}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+                <div className="mb-6 grid grid-cols-2 gap-3">
+                  <BudgetCard
+                    label="Ingresos"
+                    amount={actualIncome}
+                    sublabel={`de ${new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(expectedIncome)} esperados`}
+                    trend={actualIncome >= expectedIncome ? "up" : "neutral"}
+                  />
+                  <BudgetCard
+                    label="Gastos"
+                    amount={actualExpenses}
+                    sublabel="Este mes"
+                    trend={actualExpenses > 0 ? "down" : "neutral"}
+                  />
+                </div>
+                {unpaidFixedBudgets.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Gastos fijos no pagados este mes
+                    </h3>
+                    <ul className="divide-y divide-border border border-border">
+                      {unpaidFixedBudgets.map((b) => (
+                        <li key={b.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                          <span className="text-foreground">{b.name}</span>
+                          <span className="font-medium text-foreground">
+                            {new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(Number(b.amount))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Al registrar el pago, marcá &quot;¿Es para un gasto fijo?&quot; y elegí uno.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-        <section className="mb-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <section className="mt-8">
+            <h3 className="mb-3 text-[10px] uppercase tracking-wider text-muted-foreground">
               Cuentas
             </h3>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {accounts.map((account, index) => (
-              <motion.div
-                key={account.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <AccountCard
-                  account={account}
-                  onClick={() => handleOpenQuickAdd(account.type === "credit_card" ? "cc_charge" : "expense")}
-                />
-              </motion.div>
-            ))}
-          </div>
-          {accounts.length === 0 && (
-            <div className="border border-dashed border-border py-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Sin cuentas. Configuralas en{" "}
-                <Link href="/settings" className="underline hover:no-underline">
-                  Ajustes
-                </Link>
-                .
-              </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {accounts.map((account, index) => (
+                <motion.div
+                  key={account.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                >
+                  <AccountCard
+                    account={account}
+                    onClick={() => handleOpenQuickAdd(account.type === "credit_card" ? "cc_charge" : "expense")}
+                  />
+                </motion.div>
+              ))}
             </div>
-          )}
-        </section>
+            {accounts.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Sin cuentas. <Link href="/settings" className="underline hover:no-underline">Ajustes</Link>.
+              </p>
+            )}
+          </section>
 
-        <section className="mb-24">
-          <h3 className="mb-4 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-            Acceso rápido
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/ledger">
-              <Button
-                variant="outline"
-                className="h-auto w-full flex-col gap-2 bg-transparent py-6"
-              >
-                <BookOpen className="h-5 w-5" />
-                <span className="text-xs">Libro diario</span>
-              </Button>
-            </Link>
-            <Link href="/budget">
-              <Button
-                variant="outline"
-                className="h-auto w-full flex-col gap-2 bg-transparent py-6"
-              >
-                <Calendar className="h-5 w-5" />
-                <span className="text-xs">Presupuesto</span>
-              </Button>
-            </Link>
-          </div>
+          <section className="mt-8 mb-24">
+            <h3 className="mb-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+              Acceso rápido
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Link href="/ledger">
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 bg-transparent py-6">
+                  <BookOpen className="h-5 w-5" />
+                  <span className="text-xs">Libro diario</span>
+                </Button>
+              </Link>
+              <Link href="/budget">
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 bg-transparent py-6">
+                  <Calendar className="h-5 w-5" />
+                  <span className="text-xs">Presupuesto</span>
+                </Button>
+              </Link>
+            </div>
+          </section>
         </section>
       </main>
 
