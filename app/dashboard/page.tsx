@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus, LogOut, Settings, BookOpen, Calendar, Check } from "lucide-react";
+import { Plus, LogOut, Settings, BookOpen, Calendar, Check, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
 import { useHondurasTimeStore } from "@/store/honduras-time";
 import { BudgetCard } from "@/components/BudgetCard";
 import { AccountCard } from "@/components/AccountCard";
 import { QuickAddModal } from "@/components/QuickAddModal";
+import { CalculatorModal } from "@/components/CalculatorModal";
 import type { Account } from "@/types/database";
 import { supabase } from "@/lib/supabase/client";
 import { playShutterSound } from "@/lib/sound";
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [periodOption, setPeriodOption] = useState<PeriodOption>("cobro");
   const [customDate, setCustomDate] = useState("");
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [quickAddType, setQuickAddType] = useState<"income" | "expense" | "transfer" | "cc_charge" | "cc_payment">("expense");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
@@ -189,6 +191,16 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={() => setShowCalculator(true)}
+              title="Calculadora"
+            >
+              <Calculator className="h-4 w-4" />
+              <span className="sr-only">Calculadora</span>
+            </Button>
             <Link href="/settings">
               <Button variant="ghost" size="icon" className="size-8">
                 <Settings className="h-4 w-4" />
@@ -378,6 +390,14 @@ export default function DashboardPage() {
             Acceso rápido
           </h3>
           <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="h-auto w-full flex-col gap-2 bg-transparent py-6"
+              onClick={() => setShowCalculator(true)}
+            >
+              <Calculator className="h-5 w-5" />
+              <span className="text-xs">Calculadora</span>
+            </Button>
             <Link href="/ledger">
               <Button variant="outline" className="h-auto w-full flex-col gap-2 bg-transparent py-6">
                 <BookOpen className="h-5 w-5" />
@@ -408,6 +428,11 @@ export default function DashboardPage() {
           <span className="sr-only">Agregar movimiento</span>
         </Button>
       </motion.div>
+
+      <CalculatorModal
+        isOpen={showCalculator}
+        onClose={() => setShowCalculator(false)}
+      />
 
       <QuickAddModal
         isOpen={showQuickAdd}
