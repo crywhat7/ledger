@@ -240,3 +240,114 @@ export function getMonthKey(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }
+
+/** Días del mes (1-31) en que hay cobro configurado (activos). */
+function getPaydaysFromSchedules(schedules: IncomeSchedule[]): number[] {
+  const days = [
+    ...new Set(
+      schedules.filter((s) => s.is_active).map((s) => s.day_of_month)
+    ),
+  ].filter((d) => d >= 1 && d <= 31);
+  return days.sort((a, b) => a - b);
+}
+
+/**
+ * Fecha (YYYY-MM-DD) del próximo cobro a partir de `fromDate`.
+ * Usa los day_of_month de income_schedules activos.
+ */
+export function getNextPayday(
+  schedules: IncomeSchedule[],
+  fromDate: Date
+): string {
+  const paydays = getPaydaysFromSchedules(schedules);
+  if (paydays.length === 0) {
+    const y = fromDate.getFullYear();
+    const m = fromDate.getMonth();
+    const nextMonth = new Date(y, m + 1, 1);
+    return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}-01`;
+  }
+  const day = fromDate.getDate();
+  const year = fromDate.getFullYear();
+  const month = fromDate.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+
+  const nextDayThisMonth = paydays.find((d) => d >= day && d <= lastDay);
+  if (nextDayThisMonth !== undefined) {
+    const m = String(month + 1).padStart(2, "0");
+    return `${year}-${m}-${String(nextDayThisMonth).padStart(2, "0")}`;
+  }
+  const firstPaydayNextMonth = paydays[0];
+  const nextMonth = new Date(year, month + 1, 1);
+  const nextLastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+  const dayClamped = Math.min(firstPaydayNextMonth, nextLastDay);
+  const ny = nextMonth.getFullYear();
+  const nm = String(nextMonth.getMonth() + 1).padStart(2, "0");
+  return `${ny}-${nm}-${String(dayClamped).padStart(2, "0")}`;
+}
+
+/**
+ * Próxima fecha para un día del mes (15 o 30). Para febrero, 30 → último día del mes.
+ */
+export function getNextDayOfMonth(fromDate: Date, dayOfMonth: number): string {
+  const y = fromDate.getFullYear();
+  const m = fromDate.getMonth();
+  const day = fromDate.getDate();
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const targetDay = Math.min(dayOfMonth, lastDay);
+  if (day <= targetDay) {
+    const mm = String(m + 1).padStart(2, "0");
+    const dd = String(targetDay).padStart(2, "0");
+    return `${y}-${mm}-${dd}`;
+  }
+  const nextMonth = new Date(y, m + 1, 1);
+  const nextLast = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+  const nextTarget = Math.min(dayOfMonth, nextLast);
+  const ny = nextMonth.getFullYear();
+  const nm = String(nextMonth.getMonth() + 1).padStart(2, "0");
+  const nd = String(nextTarget).padStart(2, "0");
+  return `${ny}-${nm}-${nd}`;
+}
+
+/** Próximo día 15. */
+export function getNext15(fromDate: Date): string {
+  return getNextDayOfMonth(fromDate, 15);
+}
+
+/** Próximo día 30 (en febrero = 28 o 29). */
+export function getNext30(fromDate: Date): string {
+  return getNextDayOfMonth(fromDate, 30);
+}
+
+/** Días restantes desde `fromDate` hasta `nextPaydayStr` (incluye el día de cobro). Mínimo 1. */
+export function getDaysUntilNextPayday(fromDate: Date, nextPaydayStr: string): number {
+  const from = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const [y, m, d] = nextPaydayStr.split("-").map(Number);
+  const to = new Date(y, m - 1, d);
+  const diff = Math.max(0, Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)));
+  return Math.max(1, diff + 1);
+}
+
+/** Semanas restantes hasta el próximo cobro (redondeo hacia arriba). Mínimo 1. */
+export function getWeeksUntilNextPayday(fromDate: Date, nextPaydayStr: string): number {
+  const days = getDaysUntilNextPayday(fromDate, nextPaydayStr);
+  return Math.max(1, Math.ceil(days / 7));
+}
+
+/**
+ * Disponible por día hasta el próximo cobro = saldo / días restantes.
+ * Disponible por semana = saldo / semanas restantes.
+ * No se restan gastos fijos; el saldo es la base.
+ */
+export function getDailyDisposableUntilNextPayday(
+  balance: number,
+  daysLeft: number
+): number {
+  return daysLeft > 0 ? balance / daysLeft : 0;
+}
+
+export function getWeeklyDisposableUntilNextPayday(
+  balance: number,
+  weeksLeft: number
+): number {
+  return weeksLeft > 0 ? balance / weeksLeft : 0;
+}

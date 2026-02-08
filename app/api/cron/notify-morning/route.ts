@@ -27,14 +27,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sent: 0 });
   }
 
-  const now = new Date();
+  const utc = new Date();
+  const hondurasNow = new Date(utc.getTime() - 6 * 60 * 60 * 1000);
   const format = (n: number) =>
     new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL" }).format(n);
   let sent = 0;
 
   for (const sub of subs) {
     try {
-      const { dailyDisposable } = await getDisposableForUser(supabase, sub.user_id, now);
+      const { dailyDisposable } = await getDisposableForUser(supabase, sub.user_id, hondurasNow);
       await sendPushNotification(
         {
           endpoint: sub.endpoint,

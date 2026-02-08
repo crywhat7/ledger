@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
 import { getMonthKey } from "@/lib/budget";
+import { getNowHonduras, getHondurasDateString } from "@/lib/honduras-time";
 import type { Account } from "@/types/database";
 import type { Budget } from "@/types/database";
 
@@ -89,7 +90,7 @@ export function QuickAddModal({
 
   useEffect(() => {
     if (!isOpen || type !== "expense" || !userId) return;
-    const month = getMonthKey(new Date());
+    const month = getMonthKey(getNowHonduras());
     (async () => {
       const [budgRes, paidRes] = await Promise.all([
         supabase
@@ -169,7 +170,7 @@ export function QuickAddModal({
         amount: num,
         concept: concept.trim() || getDefaultConcept(type),
         account_id: accountId,
-        transaction_date: new Date().toISOString().split("T")[0],
+        transaction_date: getHondurasDateString(getNowHonduras()),
       };
       if (type === "transfer") payload.to_account_id = toAccountId;
       if (type === "cc_charge" || type === "cc_payment") payload.credit_card_account_id = ccAccountId;
@@ -186,7 +187,7 @@ export function QuickAddModal({
         return;
       }
       if (type === "expense" && selectedBudgetId) {
-        const month = getMonthKey(new Date());
+        const month = getMonthKey(getNowHonduras());
         const { error: paidError } = await supabase.from("budget_month_paid").insert({
           user_id: userId,
           budget_id: selectedBudgetId,

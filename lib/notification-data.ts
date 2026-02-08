@@ -1,73 +1,37 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Budget } from "@/types/database";
+import type { IncomeSchedule } from "@/types/database";
 import {
-  getQuincenaBounds,
-  getQuincenaDateRange,
-  getIncomeInQuincena,
-  getExpensesInQuincena,
-  getFixedDueInQuincenaUnpaid,
-  getAvailableFromQuincenaIncome,
-  getDaysLeftInQuincena,
-  getWeeksLeftInQuincena,
-  getDailyDisposableFromDaysLeft,
-  getWeeklyDisposable,
-  getMonthKey,
+  getNextPayday,
+  getDaysUntilNextPayday,
+  getWeeksUntilNextPayday,
+  getDailyDisposableUntilNextPayday,
+  getWeeklyDisposableUntilNextPayday,
 } from "@/lib/budget";
 
-type TransactionRow = { type: string; amount: number; transaction_date: string };
-type DueDateRow = { budget_id: string; day_of_month: number; percentage: number };
-
+/**
+ * Obtiene disponible por día y por semana hasta el próximo cobro.
+ * Base = saldo actual (suma de cuentas). No se restan gastos fijos.
+ */
 export async function getDisposableForUser(
   supabase: SupabaseClient,
   userId: string,
   date: Date = new Date()
 ): Promise<{ dailyDisposable: number; weeklyDisposable: number }> {
-  const monthKey = getMonthKey(date);
-  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const endDate = `${monthKey}-${String(lastDay).padStart(2, "0")}`;
-
-  const [txRes, budgetsRes, dueRes, paidRes] = await Promise.all([
-    supabase
-      .from("transactions")
-      .select("type, amount, transaction_date")
-      .eq("user_id", userId)
-      .gte("transaction_date", `${monthKey}-01`)
-      .lte("transaction_date", endDate),
-    supabase.from("budgets").select("*").eq("user_id", userId),
-    supabase.from("budget_due_dates").select("budget_id, day_of_month, percentage"),
-    supabase
-      .from("budget_month_paid")
-      .select("budget_id")
-      .eq("user_id", userId)
-      .eq("month", monthKey),
+  const [accountsRes, schedRes] = await Promise.all([
+    supabase.from("accounts").select("balance").eq("user_id", userId),
+    supabase.from("income_schedules").select("*").eq("user_id", userId),
   ]);
 
-  const transactions = (txRes.data ?? []) as TransactionRow[];
-  const budgets = (budgetsRes.data ?? []) as Budget[];
-  const dueDates = (dueRes.data ?? []) as DueDateRow[];
-  const paidThisMonth = paidRes.data ?? [];
-  const paidBudgetIds = new Set(paidThisMonth.map((p: { budget_id: string }) => p.budget_id));
+  const accounts = accountsRes.data ?? [];
+  const balance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
+  const schedules = (schedRes.data ?? []) as IncomeSchedule[];
 
-  const { startDay, endDay } = getQuincenaBounds(date);
-  const { start: quincenaStart, end: quincenaEnd } = getQuincenaDateRange(date);
-  const incomeInQuincena = getIncomeInQuincena(transactions, quincenaStart, quincenaEnd);
-  const expensesInQuincena = getExpensesInQuincena(transactions, quincenaStart, quincenaEnd);
-  const fixedDueThisQuincena = getFixedDueInQuincenaUnpaid(
-    budgets,
-    dueDates,
-    startDay,
-    endDay,
-    paidBudgetIds
-  );
-  const available = getAvailableFromQuincenaIncome(
-    incomeInQuincena,
-    fixedDueThisQuincena,
-    expensesInQuincena
-  );
-  const daysLeft = getDaysLeftInQuincena(date, endDay);
-  const weeksLeft = getWeeksLeftInQuincena(date, endDay);
-  const dailyDisposable = getDailyDisposableFromDaysLeft(available, daysLeft);
-  const weeklyDisposable = getWeeklyDisposable(available, weeksLeft);
+  const nextPaydayStr = getNextPayday(schedules, date);
+  const daysLeft = getDaysUntilNextPayday(date, nextPaydayStr);
+  const weeksLeft = getWeeksUntilNextPayday(date, nextPaydayStr);
+
+  const dailyDisposable = getDailyDisposableUntilNextPayday(balance, daysLeft);
+  const weeklyDisposable = getWeeklyDisposableUntilNextPayday(balance, weeksLeft);
 
   return { dailyDisposable, weeklyDisposable };
 }
